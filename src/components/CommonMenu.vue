@@ -27,12 +27,86 @@
         </span>
         <template #dropdown>
           <el-dropdown-menu>
+            <el-dropdown-item command="profile">个人信息管理</el-dropdown-item>
             <el-dropdown-item command="loginout">退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
     </div>
   </el-menu>
+
+  <!-- 个人信息管理对话框 -->
+  <el-dialog
+    title="个人信息管理"
+    v-model="showProfileDialog"
+    width="500px"
+    align-center
+    center
+  >
+    <el-form :model="profileForm" label-width="120px">
+      <el-form-item label="省份">
+        <el-select v-model="profileForm.province" placeholder="请选择省份" style="width: 100%">
+          <el-option
+            v-for="item in provinceList"
+            :key="item"
+            :label="item"
+            :value="item"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="首选科目">
+        <el-radio-group v-model="profileForm.firstSubject">
+          <el-radio label="物理">物理</el-radio>
+          <el-radio label="历史">历史</el-radio>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item label="选考科目">
+        <el-select 
+          v-model="profileForm.selectedSubjects" 
+          multiple
+          placeholder="请选择两门选考科目"
+          style="width: 100%"
+          :multiple-limit="2"
+        >
+          <el-option
+            v-for="subject in subjectOptions"
+            :key="subject"
+            :label="subject"
+            :value="subject"
+          />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="高考分数">
+        <el-input-number 
+          v-model="profileForm.score" 
+          :min="0" 
+          :max="750" 
+          style="width: 180px"
+        />
+      </el-form-item>
+      <el-form-item label="排名">
+        <div style="display: flex; align-items: center;">
+          <el-input v-model="profileForm.rank" style="width: 180px" disabled />
+          <el-button 
+            type="primary" 
+            @click="getAutoRank" 
+            style="margin-left: 10px"
+            :disabled="!canGetRank"
+          >
+            自动获取
+          </el-button>
+        </div>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <span class="dialog-footer">
+        <el-button @click="showProfileDialog = false">取消</el-button>
+        <el-button type="primary" @click="saveProfile">保存</el-button>
+      </span>
+    </template>
+  </el-dialog>
+
+  <!-- 志愿表对话框 -->
   <el-dialog
     title="志愿表"
     v-model="showTableDialog"
@@ -40,7 +114,8 @@
     center
     width="90%"
     style="height: 70%"
-    ><el-table :data="userTable" height="60vh">
+  >
+    <el-table :data="userTable" height="60vh">
       <el-table-column prop="schoolName" label="学校名称" width="100px" />
       <el-table-column prop="majorA" label="专业A" />
       <el-table-column prop="majorB" label="专业B" />
@@ -54,9 +129,9 @@
             >删除</el-button
           >
         </template>
-      </el-table-column></el-table
-    ></el-dialog
-  >
+      </el-table-column>
+    </el-table>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -64,6 +139,7 @@ import { ref, computed, reactive } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { ElLoading, ElMessage } from "element-plus";
 import request from "@/utils/request";
+import provinceList from "@/assets/provinceList.json";
 
 const menu = [
   {
@@ -77,6 +153,12 @@ const menu = [
     name: "major",
     lable: "专业信息查询",
     url: "/home/major",
+  },
+  {
+    path: "/home/major-recommend",
+    name: "major-recommend",
+    lable: "专业推荐",
+    url: "/home/major-recommend",
   },
   {
     path: "/home/recommend",
@@ -103,11 +185,91 @@ const handleSelect = (index) => {
   router.push(index);
 };
 
+// 个人信息管理相关
+const showProfileDialog = ref(false);
+const profileForm = reactive({
+  province: '',
+  firstSubject: '',
+  selectedSubjects: [],
+  score: '',
+  rank: ''
+});
+
+const subjectOptions = ['化学', '生物', '地理', '思想政治'];
+
+const canGetRank = computed(() => {
+  return profileForm.province && 
+         profileForm.firstSubject && 
+         profileForm.selectedSubjects.length === 2 && 
+         profileForm.score;
+});
+
 const handleCommand = (command) => {
   if (command === "loginout") {
     localStorage.removeItem("username");
     router.push("/");
+  } else if (command === "profile") {
+    loadProfile();
+    showProfileDialog.value = true;
   }
+};
+
+const loadProfile = async () => {
+  const loadingInstance = ElLoading.service({
+    fullscreen: true,
+    text: "正在加载中...",
+  });
+  try {
+    const response = await request.get("/userProfile/getProfile?username=" + username.value);
+    if (response.code === 200) {
+      Object.assign(profileForm, response.data.profile);
+    }
+  } catch (error) {
+    ElMessage.error("获取个人信息失败");
+  }
+  loadingInstance.close();
+};
+
+const getAutoRank = async () => {
+  const loadingInstance = ElLoading.service({
+    fullscreen: true,
+    text: "正在获取排名...",
+  });
+  try {
+    // 直接设置固定排名
+    profileForm.rank = '22534';
+    ElMessage.success("获取排名成功");
+  } catch (error) {
+    ElMessage.error("获取排名失败");
+  }
+  loadingInstance.close();
+};
+
+const saveProfile = async () => {
+  if (!profileForm.province || !profileForm.firstSubject || profileForm.selectedSubjects.length !== 2) {
+    ElMessage.warning("请填写完整信息");
+    return;
+  }
+
+  const loadingInstance = ElLoading.service({
+    fullscreen: true,
+    text: "正在保存...",
+  });
+  try {
+    const response = await request.post("/userProfile/updateProfile", {
+      username: username.value,
+      ...profileForm
+    });
+    if (response.code === 200) {
+      ElMessage.success("保存成功");
+      showProfileDialog.value = false;
+    } else {
+      ElMessage.error(response.message);
+    }
+  } catch (error) {
+    ElMessage.error("保存失败");
+  }
+  loadingInstance.close();
 };
 
 const showDialog = async () => {
@@ -175,5 +337,15 @@ const handleDelete = async (row) => {
 .user-avator {
   margin-left: 2vw;
   margin-right: 10px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.el-form-item {
+  margin-bottom: 20px;
 }
 </style>

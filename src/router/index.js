@@ -5,6 +5,7 @@ import SchoolView from "@/views/SchoolView.vue";
 import MajorView from "@/views/MajorView.vue";
 import RecommendView from "@/views/RecommendView.vue";
 import SchoolDetail from "@/views/SchoolDetail.vue";
+import MajorRecommendView from "@/views/MajorRecommendView.vue";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,6 +37,11 @@ const router = createRouter({
           path: "major",
           name: "major",
           component: MajorView,
+        },
+        {
+          path: "major-recommend",
+          name: "major-recommend",
+          component: MajorRecommendView,
         },
         {
           path: "recommend",

@@ -1,23 +1,58 @@
 <template>
-  <el-form label-width="80px" label-position="left">
+  <el-form label-width="60px" label-position="left">
     <div class="rank-box">
-      <el-form-item label="选科">
-        <!-- 仅作展示，无实际作用 -->
-        <el-radio-group v-model="subject">
-          <el-radio label="理科" value="理科">理科</el-radio>
-          <el-radio label="文科" value="文科">文科</el-radio>
-        </el-radio-group>
+      <el-form-item label="省份">
+        <el-select
+            v-model="province"
+            filterable
+            clearable
+            placeholder="请选择省份"
+            size="large"
+            style="width: 240px"
+        >
+          <el-option
+              v-for="item in provinceList"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+          />
+        </el-select>
       </el-form-item>
-      <el-form-item label="分数" style="margin-left: 8vw">
-        <el-input
-          v-model="userScore"
-          placeholder="您的分数"
-          type="number"
-          @keyup.enter="getRank()"
-        ></el-input>
+      <el-form-item label="喜欢的专业" label-width="100px" style="margin-left: 2vw">
+        <el-select
+            v-model="fondMajor"
+            filterable
+            clearable
+            placeholder="请选择专业"
+            size="large"
+            style="width: 240px"
+            multiple
+        >
+          <el-option
+              v-for="item in majorList"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+          />
+        </el-select>
       </el-form-item>
-      <el-form-item label="排名" style="margin-left: 2vw">
-        <el-input v-model="userRank" placeholder="您的排名" disabled></el-input>
+      <el-form-item label="不喜欢的专业" label-width="100px" style="margin-left: 2vw">
+        <el-select
+            v-model="dislikedMajor"
+            placeholder="请选择专业"
+            filterable
+            clearable
+            size="large"
+            style="width: 240px"
+            multiple
+        >
+          <el-option
+              v-for="item in majorList"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+          />
+        </el-select>
       </el-form-item>
       <el-button
         type="primary"
@@ -63,30 +98,79 @@
               <p>{{ school.schoolName }}</p>
               <span>&nbsp;&nbsp;最低位次：{{ school.rank2022 }}</span>
               <span>&nbsp;&nbsp;预测投档线：{{ averageScores[index] }}</span>
-              <span
-                >&nbsp;&nbsp;录取概率：&nbsp;&nbsp;<el-icon
-                  size="20px"
-                  :color="
-                    upLineRateList[index] < 60
+              <span>&nbsp;&nbsp;录取概率：&nbsp;&nbsp;
+<!--                <el-icon-->
+<!--                  size="20px"-->
+<!--                  :color="-->
+<!--                    upLineRateList[index] < 60-->
+<!--                      ? '#FF0000'-->
+<!--                      : upLineRateList[index] >= 80-->
+<!--                      ? '#21c33c'-->
+<!--                      : '#409eff'-->
+<!--                  "-->
+<!--                >-->
+<!--                  {{-->
+<!--                    upLineRateList[index] == 0 ? "<25" : upLineRateList[index]-->
+<!--                  }}%-->
+<!--                </el-icon>-->
+                <el-icon
+                    size="20px"
+                    :color="
+                    school.maxProbability < 60
                       ? '#FF0000'
-                      : upLineRateList[index] >= 80
+                      : school.maxProbability >= 80
                       ? '#21c33c'
                       : '#409eff'
-                  "
-                >
+                  ">
                   {{
-                    upLineRateList[index] == 0 ? "<25" : upLineRateList[index]
-                  }}%</el-icon
-                ></span
-              >
+                    school.maxProbability == 0 ? "<25" :school.maxProbability
+                  }}%
+                </el-icon>
+              </span>
             </div>
-            <el-button
-              size="large"
-              style="margin: auto 0"
-              @click.stop="handleCommit(school.schoolId)"
-            >
-              +志愿表
-            </el-button>
+          </div>
+
+          <div class="major-group-info">
+            <ul>
+              <li class="major-group-item radius" v-for="(majorGroup, index) in school.majorGroupList" :key="majorGroup.id">
+                <el-row>
+                  <el-col :span="6">
+                    <span> 专业组&nbsp;{{majorGroup.id}}</span>
+                  </el-col>
+                  <el-col :span="6">
+                    <span v-for="(subjectRequirement, index) in majorGroup.subjectRequirements" :key="subjectRequirement">&nbsp;&nbsp;
+                      {{ subjectRequirement }}
+                    </span>
+                  </el-col>
+                  <el-col :span="6">
+                    <span>&nbsp;
+                      <el-icon
+                          size="20px"
+                          :color="
+                          majorGroup.probability < 60
+                            ? '#FF0000'
+                            : majorGroup.probability >= 80
+                            ? '#21c33c'
+                            : '#409eff'
+                        "
+                      >
+                         {{majorGroup.probability}}%
+                      </el-icon>
+                    </span>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-button
+                        size="large"
+                        style="margin: auto 0"
+                        @click.stop="handleCommit(school.schoolId)"
+                    >
+                      +志愿表
+                    </el-button>
+                  </el-col>
+                </el-row>
+
+              </li>
+            </ul>
           </div>
         </el-card>
       </li>
@@ -134,7 +218,26 @@ import { ElLoading, ElMessage } from "element-plus";
 import { useRouter } from "vue-router";
 import request from "../utils/request.js";
 
-const subject = ref("理科");
+const subject = ref("1");
+const fondMajor = ref("1");
+const dislikedMajor = ref("1");
+const majorList = ref([
+  {
+    value: '1',
+    label: '计算机科学与技术'
+  },
+  {
+    value: '2',
+    label: '软件工程'
+  }
+]);
+const province = ref("福建");
+const provinceList = ref([
+  {
+    value: '1',
+    label: '福建'
+  }
+]);
 const userScore = ref(600);
 const userRank = ref("");
 const risk = ref("全部");
@@ -167,6 +270,10 @@ const goToDetail = (id) => {
   router.push({ name: "schoolDetail", params: { id: id } });
 };
 
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 const getRecommendList = async () => {
   const loadingInstance = ElLoading.service({
     fullscreen: true,
@@ -183,6 +290,28 @@ const getRecommendList = async () => {
     );
     if (response.code == 200) {
       schoolList.value = response.data.schools;
+
+      for (let i = 0; i < schoolList.value.length; i++) {
+        let school = schoolList.value[i];
+        school.majorGroupList = [];
+        let num = getRandomInt(1,3);
+        school.maxProbability = -1;
+        for (let j = 0; j < num; j++) {
+          let item = {
+            id: 200 + getRandomInt(1,9),
+                subjectRequirements: [
+                  '物','生'
+              ],
+              probability: getRandomInt(50,90)
+          }
+          school.majorGroupList.push(item);
+
+          if (item.probability > school.maxProbability) {
+            school.maxProbability = item.probability;
+          }
+        }
+      }
+
       averageScores.value = response.data.averageScores;
       upLineRateList.value = response.data.upLineRateList;
       total.value = response.data.total;
@@ -337,7 +466,7 @@ li {
 
 .schoolCard {
   margin: 20px auto;
-  height: 140px;
+  //height: 140px;
   border-radius: 10px;
 }
 
@@ -356,6 +485,11 @@ li {
   width: 100%;
 }
 
+.major-group-info {
+  text-align: center;
+  width: 100%;
+}
+
 p {
   font-size: large;
 }
@@ -368,5 +502,14 @@ p {
   display: flex;
   justify-content: space-between;
   margin-top: 10px;
+}
+
+.major-group-item {
+  border-top: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  margin-top: 10px;
+  padding: 10px;
+  height: 50px;
+  line-height: 50px;
 }
 </style>

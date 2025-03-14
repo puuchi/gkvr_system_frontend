@@ -85,47 +85,6 @@
         </li>
       </ul>
     </div>
-    <div class="heat-rank">
-      <el-card class="rankCard" shadow="hover">
-        <template #header>
-          <h1 style="text-align: center; margin: 0 auto">院校热度</h1>
-        </template>
-        <ul>
-          <li
-            v-for="(item, index) in schoolRankList"
-            :key="index"
-            class="heat-item"
-          >
-            <span
-              v-if="index == 0"
-              class="badge"
-              style="color: #fff; background: #da1d1d"
-              >{{ index + 1 }}</span
-            >
-            <span
-              v-if="index == 1"
-              class="badge"
-              style="color: #fff; background: #fc6639"
-              >{{ index + 1 }}</span
-            >
-            <span
-              v-if="index == 2"
-              class="badge"
-              style="color: #fff; background: #f6b759"
-              >{{ index + 1 }}</span
-            >
-            <span
-              v-if="(index !== 0) & (index !== 1) & (index !== 2)"
-              class="badge"
-              style="color: #999; background: #eee"
-              >{{ index + 1 }}</span
-            >
-            <span class="school-name">{{ item.school }}</span>
-            <span class="heat-value">{{ item.heat }}</span>
-          </li>
-        </ul>
-      </el-card>
-    </div>
   </div>
   <el-pagination
     class="pagination"

@@ -181,10 +181,10 @@ const initScoreChart = (scores) => {
   scoreChart = echarts.init(document.getElementById("score-chart"));
   scoreChart.setOption({
     title: {
-      text: "四川省分数线",
+      text: "分数线",
       left: "center",
     },
-    color: "#f5460c",
+    color: "#0c46f5",
     legend: {
       data: ["理科"],
       top: "8%",
@@ -240,7 +240,7 @@ const initLevelChart = (academic) => {
       right: "2%",
       bottom: "3%",
     },
-    color: "#f5940c",
+    color: "#0c94f5",
     xAxis: {
       type: "value",
       axisLabel: {
@@ -417,7 +417,7 @@ onMounted(getSchoolDetail);
 #tag-card {
   width: 100%;
   height: 200px;
-  background-image: linear-gradient(135deg, #f5940c 10%, #fae52a 100%);
+  background-image: linear-gradient(135deg, #0c94f5 10%, #2ae5fa 100%);
   display: flex;
 }
 
@@ -498,14 +498,14 @@ p {
 }
 
 .school_rank_text {
-  color: #f60;
+  color: #0066ff;
   margin-bottom: 8px;
   line-height: 20px;
 }
 
 .school_rank_num {
   font-size: 30px;
-  color: #f60;
+  color: #0066ff;
   margin-right: 1px;
 }
 

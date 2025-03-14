@@ -1,7 +1,7 @@
 <template>
   <el-form label-width="80px" label-position="left">
     <div class="rank-box">
-      <el-form-item label="科类">
+      <el-form-item label="选科">
         <!-- 仅作展示，无实际作用 -->
         <el-radio-group v-model="subject">
           <el-radio label="理科" value="理科">理科</el-radio>

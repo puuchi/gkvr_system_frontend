@@ -12,9 +12,9 @@
         >
           <el-option
               v-for="item in provinceList"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
+              :key="item"
+              :label="item"
+              :value="item"
           />
         </el-select>
       </el-form-item>
@@ -29,10 +29,10 @@
             multiple
         >
           <el-option
-              v-for="item in majorList"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
+              v-for="item in majorTypeList"
+              :key="item"
+              :label="item"
+              :value="item"
           />
         </el-select>
       </el-form-item>
@@ -47,10 +47,10 @@
             multiple
         >
           <el-option
-              v-for="item in majorList"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
+              v-for="item in majorTypeList"
+              :key="item"
+              :label="item"
+              :value="item"
           />
         </el-select>
       </el-form-item>
@@ -217,27 +217,13 @@ import { onMounted, ref, reactive, watch } from "vue";
 import { ElLoading, ElMessage } from "element-plus";
 import { useRouter } from "vue-router";
 import request from "../utils/request.js";
+import provinceList from "@/assets/provinceList.json";
+import majorTypeList from "@/assets/majorTypeList.json";
 
 const subject = ref("1");
 const fondMajor = ref("1");
 const dislikedMajor = ref("1");
-const majorList = ref([
-  {
-    value: '1',
-    label: '计算机科学与技术'
-  },
-  {
-    value: '2',
-    label: '软件工程'
-  }
-]);
 const province = ref("福建");
-const provinceList = ref([
-  {
-    value: '1',
-    label: '福建'
-  }
-]);
 const userScore = ref(600);
 const userRank = ref("");
 const risk = ref("全部");

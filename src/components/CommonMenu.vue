@@ -360,9 +360,16 @@ const loadProfile = async () => {
     text: "正在加载中...",
   });
   try {
-    const response = await request.get("/userProfile/getProfile?username=" + username.value);
+    const response = await request.get("/user/score/get/" + username.value);
     if (response.code === 200) {
-      Object.assign(profileForm, response.data.profile);
+      profileForm.secondSubjects = [];
+      let data =  response.data;
+      profileForm.province = data.province;
+      profileForm.score = data.score;
+      profileForm.rank = data.rank;
+      profileForm.firstSubject = data.majorA;
+      profileForm.secondSubjects[0] = data.majorB;
+      profileForm.secondSubjects[1] = data.majorC;
     }
   } catch (error) {
     ElMessage.error("获取个人信息失败");
@@ -381,12 +388,12 @@ const getAutoRank = async () => {
     ElMessage.success("获取排名成功");
     
     // 然后再发送请求获取真实排名
-    // const response = await request.get(
-    //   `/scoreRank/getRank?score=${profileForm.score}&province=${profileForm.province}`
-    // );
+    const response = await request.get(
+      `/scoreRank/getRank?score=${profileForm.score}&province=${profileForm.province}`
+    );
     if (response.code === 200) {
       // 如果后端返回成功，更新为真实排名
-      profileForm.rank = response.data.rank;
+      profileForm.rank = response.data.scoreRank.rank;
     }
   } catch (error) {
     // 发生错误时保持显示固定排名
@@ -406,10 +413,16 @@ const saveProfile = async () => {
     text: "正在保存...",
   });
   try {
-    const response = await request.post("/userProfile/updateProfile", {
+    let param = {
       username: username.value,
-      ...profileForm
-    });
+      province: profileForm.province,
+      score: profileForm.score,
+      rank: profileForm.rank,
+      majorA: profileForm.firstSubject,
+      majorB: profileForm.secondSubjects.length > 0 ?  profileForm.secondSubjects[0] : null,
+      majorC: profileForm.secondSubjects.length > 1 ? profileForm.secondSubjects[1] : null,
+    };
+    const response = await request.post("/user/save/score", param);
     if (response.code === 200) {
       ElMessage.success("保存成功");
       showProfileDialog.value = false;

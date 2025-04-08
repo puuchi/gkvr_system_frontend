@@ -29,28 +29,10 @@
             multiple
         >
           <el-option
-              v-for="item in majorTypeList"
-              :key="item"
-              :label="item"
-              :value="item"
-          />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="不喜欢的专业" label-width="100px" style="margin-left: 2vw">
-        <el-select
-            v-model="dislikedMajor"
-            placeholder="请选择专业"
-            filterable
-            clearable
-            size="large"
-            style="width: 240px"
-            multiple
-        >
-          <el-option
-              v-for="item in majorTypeList"
-              :key="item"
-              :label="item"
-              :value="item"
+              v-for="item in majorOptions"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
           />
         </el-select>
       </el-form-item>
@@ -99,20 +81,6 @@
               <span>&nbsp;&nbsp;最低位次：{{ school.rank2022 }}</span>
               <span>&nbsp;&nbsp;预测投档线：{{ averageScores[index] }}</span>
               <span>&nbsp;&nbsp;录取概率：&nbsp;&nbsp;
-<!--                <el-icon-->
-<!--                  size="20px"-->
-<!--                  :color="-->
-<!--                    upLineRateList[index] < 60-->
-<!--                      ? '#FF0000'-->
-<!--                      : upLineRateList[index] >= 80-->
-<!--                      ? '#21c33c'-->
-<!--                      : '#409eff'-->
-<!--                  "-->
-<!--                >-->
-<!--                  {{-->
-<!--                    upLineRateList[index] == 0 ? "<25" : upLineRateList[index]-->
-<!--                  }}%-->
-<!--                </el-icon>-->
                 <el-icon
                     size="20px"
                     :color="
@@ -138,10 +106,9 @@
                     <span> 专业组&nbsp;{{majorGroup.majorGroupName}}</span>
                   </el-col>
                   <el-col :span="6">
-<!--                    <span v-for="(subjectRequirement, index) in majorGroup.subjectRequirements" :key="subjectRequirement">&nbsp;&nbsp;-->
-<!--                      {{ subjectRequirement }}-->
-<!--                    </span>-->
-                    物 生
+                    <span v-for="(subjectRequirement, index) in majorGroup.subjectRequirements" :key="subjectRequirement">&nbsp;&nbsp;
+                      {{ subjectRequirement }}
+                    </span>
                   </el-col>
                   <el-col :span="6">
                     <span>&nbsp;
@@ -221,13 +188,14 @@ import request from "../utils/request.js";
 import provinceList from "@/assets/provinceList.json";
 import majorTypeList from "@/assets/majorTypeList.json";
 
-const fondMajor = ref("1");
-const dislikedMajor = ref("1");
+const fondMajor = ref([]);
+// const dislikedMajor = ref([]);
 const province = ref("福建");
 const userScore = ref(600);
 const userRank = ref("");
 const userInfo = ref({});
 const risk = ref("全部");
+const majorOptions = ref([]);
 const schoolList = ref([]);
 const averageScores = ref([]);
 const pageNum = ref(1);
@@ -254,7 +222,7 @@ function getRandomInt(min, max) {
 
 const getRank = async () => {
   let score = userInfo.value.score;
-  if (score) {
+  if (!score) {
     ElMessage.error("请输入分数！");
     return;
   }
@@ -284,12 +252,16 @@ const getRank = async () => {
 const init = async () => {
   const username = localStorage.getItem("username");
   try {
+    request.get(
+        "/majorInfo/options"
+    ).then((res) => {
+      majorOptions.value = res.data;
+    });
     const response = await request.get(
         "/user/score/get/" + username
     );
     if (response.code == 200) {
       userInfo.value = response.data;
-      province.value = userInfo.value.province;
       getRank();
       getRecommendList();
     } else {
@@ -300,6 +272,16 @@ const init = async () => {
   }
 };
 
+function getRandomTwoElements(arr) {
+  if (arr.length < 2) return [];
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled.slice(0, 2);
+}
+
 const getRecommendList = async () => {
   const loadingInstance = ElLoading.service({
     fullscreen: true,
@@ -307,50 +289,47 @@ const getRecommendList = async () => {
   });
 
   try {
-    const response = await request.get(
-      "/scoreRank/getReco?page=" +
-        pageNum.value +
-        "&score=" +
-        userInfo.value.score +
-        "&risk=" +
-        risk.value
+    let param = {
+      page: pageNum.value,
+      score: userInfo.value.score,
+      province: province.value,
+      risk: risk.value,
+      likeMajorIds: fondMajor.value
+    };
+    const response = await request.post(
+      "/scoreRank/getReco", param
     );
+    let schoolMap = localStorage.getItem("schoolMap");
+    if (schoolMap) {
+      schoolMap = JSON.parse(schoolMap);
+    } else {
+      schoolMap = {};
+    }
+
     if (response.code == 200) {
       let subjectRequirements = getSubjectRequirements();
+      let score = userInfo.value.score;
       response.data.schools.forEach((school) => {
-        school.majorGroups.forEach((majorGroup) => {
-          majorGroup.probability = school.upLineRate - getRandomInt(1, 15);
-          majorGroup.schoolName = school.schoolName;
-          majorGroup.subjectRequirements = subjectRequirements;
-        });
-        school.majorGroups = school.majorGroups.slice(0, getRandomInt(2, 4));
-        let index = getRandomInt(0, school.majorGroups.length - 1);
-        if (school.majorGroups[index]) {
-          school.majorGroups[index].probability = school.upLineRate;
+        let key = school.id + "-" + score;
+        if (schoolMap[key]) {
+          school.majorGroups = schoolMap[key];
+        } else {
+          school.majorGroups.forEach((majorGroup) => {
+            majorGroup.probability = school.upLineRate - getRandomInt(1, 15);
+            majorGroup.schoolName = school.schoolName;
+            majorGroup.subjectRequirements = getRandomTwoElements(subjectRequirements);
+          });
+          school.majorGroups = school.majorGroups.slice(0, getRandomInt(2, 4));
+          let index = getRandomInt(0, school.majorGroups.length - 1);
+          if (school.majorGroups[index]) {
+            school.majorGroups[index].probability = school.upLineRate;
+          }
+          schoolMap[key] = school.majorGroups;
         }
       });
-      schoolList.value = response.data.schools;
 
-      // for (let i = 0; i < schoolList.value.length; i++) {
-      //   let school = schoolList.value[i];
-      //   school.majorGroupList = [];
-      //   let num = getRandomInt(1,3);
-      //   school.maxProbability = -1;
-      //   for (let j = 0; j < num; j++) {
-      //     let item = {
-      //       id: 200 + getRandomInt(1,9),
-      //           subjectRequirements: [
-      //             '物','生'
-      //         ],
-      //         probability: getRandomInt(50,90)
-      //     }
-      //     school.majorGroupList.push(item);
-      //
-      //     if (item.probability > school.maxProbability) {
-      //       school.maxProbability = item.probability;
-      //     }
-      //   }
-      // }
+      localStorage.setItem("schoolMap", JSON.stringify(schoolMap));
+      schoolList.value = response.data.schools;
 
       averageScores.value = response.data.averageScores;
       total.value = response.data.total;

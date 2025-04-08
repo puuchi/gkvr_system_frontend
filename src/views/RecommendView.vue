@@ -57,7 +57,7 @@
       <el-button
         type="primary"
         style="margin-left: 4vw"
-        @click="getRecommendList"
+        @click="init"
       >
         <el-icon>
           <Search />
@@ -116,14 +116,14 @@
                 <el-icon
                     size="20px"
                     :color="
-                    school.maxProbability < 60
+                    school.upLineRate < 60
                       ? '#FF0000'
-                      : school.maxProbability >= 80
+                      : school.upLineRate >= 80
                       ? '#21c33c'
                       : '#409eff'
                   ">
                   {{
-                    school.maxProbability == 0 ? "<25" :school.maxProbability
+                    school.upLineRate == 0 ? "<25" :school.upLineRate
                   }}%
                 </el-icon>
               </span>
@@ -132,15 +132,16 @@
 
           <div class="major-group-info">
             <ul>
-              <li class="major-group-item radius" v-for="(majorGroup, index) in school.majorGroupList" :key="majorGroup.id">
+              <li class="major-group-item radius" v-for="(majorGroup, index) in school.majorGroups" :key="majorGroup.id">
                 <el-row>
                   <el-col :span="6">
-                    <span> 专业组&nbsp;{{majorGroup.id}}</span>
+                    <span> 专业组&nbsp;{{majorGroup.majorGroupName}}</span>
                   </el-col>
                   <el-col :span="6">
-                    <span v-for="(subjectRequirement, index) in majorGroup.subjectRequirements" :key="subjectRequirement">&nbsp;&nbsp;
-                      {{ subjectRequirement }}
-                    </span>
+<!--                    <span v-for="(subjectRequirement, index) in majorGroup.subjectRequirements" :key="subjectRequirement">&nbsp;&nbsp;-->
+<!--                      {{ subjectRequirement }}-->
+<!--                    </span>-->
+                    物 生
                   </el-col>
                   <el-col :span="6">
                     <span>&nbsp;
@@ -162,7 +163,7 @@
                     <el-button
                         size="large"
                         style="margin: auto 0"
-                        @click.stop="handleCommit(school.schoolId)"
+                        @click.stop="handleCommit(majorGroup)"
                     >
                       +志愿表
                     </el-button>
@@ -220,36 +221,27 @@ import request from "../utils/request.js";
 import provinceList from "@/assets/provinceList.json";
 import majorTypeList from "@/assets/majorTypeList.json";
 
-const subject = ref("1");
 const fondMajor = ref("1");
 const dislikedMajor = ref("1");
 const province = ref("福建");
 const userScore = ref(600);
 const userRank = ref("");
+const userInfo = ref({});
 const risk = ref("全部");
 const schoolList = ref([]);
 const averageScores = ref([]);
-const upLineRateList = ref([]);
 const pageNum = ref(1);
 const total = ref(0);
 const schoolMajors = ref([]);
 const showTableDialog = ref(false);
 const multipleTable = ref(null);
-const VoluntaryForm = reactive({
-  userName: localStorage.getItem("username"),
-  schoolName: "",
-  majorA: "",
-  majorB: "",
-  majorC: "",
-  majorD: "",
-  majorE: "",
-  majorF: "",
-});
+const currentMajorGroup = ref(null);
+const selectedMajors = ref([]);
 const router = useRouter();
 
 watch(risk, () => {
   pageNum.value = 1;
-  getRecommendList();
+  init();
 });
 
 const goToDetail = (id) => {
@@ -260,72 +252,23 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-const getRecommendList = async () => {
-  const loadingInstance = ElLoading.service({
-    fullscreen: true,
-    text: "正在加载中...",
-  });
-  try {
-    const response = await request.get(
-      "/scoreRank/getReco?page=" +
-        pageNum.value +
-        "&score=" +
-        userScore.value +
-        "&risk=" +
-        risk.value
-    );
-    if (response.code == 200) {
-      schoolList.value = response.data.schools;
-
-      for (let i = 0; i < schoolList.value.length; i++) {
-        let school = schoolList.value[i];
-        school.majorGroupList = [];
-        let num = getRandomInt(1,3);
-        school.maxProbability = -1;
-        for (let j = 0; j < num; j++) {
-          let item = {
-            id: 200 + getRandomInt(1,9),
-                subjectRequirements: [
-                  '物','生'
-              ],
-              probability: getRandomInt(50,90)
-          }
-          school.majorGroupList.push(item);
-
-          if (item.probability > school.maxProbability) {
-            school.maxProbability = item.probability;
-          }
-        }
-      }
-
-      averageScores.value = response.data.averageScores;
-      upLineRateList.value = response.data.upLineRateList;
-      total.value = response.data.total;
-    } else {
-      ElMessage.error(response.message);
-    }
-  } catch (error) {
-    ElMessage.error(error);
-  }
-  loadingInstance.close();
-};
-
 const getRank = async () => {
-  if (userScore.value == "") {
+  let score = userInfo.value.score;
+  if (score) {
     ElMessage.error("请输入分数！");
     return;
   }
-  if (userScore.value < 0 || userScore.value > 750) {
+  if (score < 0 || score > 750) {
     ElMessage.error("请输入正确的分数！");
     return;
   }
-  if (userScore.value < 100 || userScore.value > 695) {
+  if (score < 100 || score> 695) {
     ElMessage.error("无数据");
     return;
   }
   try {
     const response = await request.get(
-      "/scoreRank/getRank?score=" + userScore.value
+        "/scoreRank/getRank?score=" +score
     );
     if (response.code == 200) {
       userRank.value = response.data.scoreRank.rankRange;
@@ -338,23 +281,107 @@ const getRank = async () => {
   }
 };
 
+const init = async () => {
+  const username = localStorage.getItem("username");
+  try {
+    const response = await request.get(
+        "/user/score/get/" + username
+    );
+    if (response.code == 200) {
+      userInfo.value = response.data;
+      province.value = userInfo.value.province;
+      getRank();
+      getRecommendList();
+    } else {
+      ElMessage.error(response.message);
+    }
+  } catch (error) {
+    ElMessage.error(error);
+  }
+};
+
+const getRecommendList = async () => {
+  const loadingInstance = ElLoading.service({
+    fullscreen: true,
+    text: "正在加载中...",
+  });
+
+  try {
+    const response = await request.get(
+      "/scoreRank/getReco?page=" +
+        pageNum.value +
+        "&score=" +
+        userInfo.value.score +
+        "&risk=" +
+        risk.value
+    );
+    if (response.code == 200) {
+      let subjectRequirements = getSubjectRequirements();
+      response.data.schools.forEach((school) => {
+        school.majorGroups.forEach((majorGroup) => {
+          majorGroup.probability = school.upLineRate - getRandomInt(1, 15);
+          majorGroup.schoolName = school.schoolName;
+          majorGroup.subjectRequirements = subjectRequirements;
+        });
+        school.majorGroups = school.majorGroups.slice(0, getRandomInt(2, 4));
+        let index = getRandomInt(0, school.majorGroups.length - 1);
+        if (school.majorGroups[index]) {
+          school.majorGroups[index].probability = school.upLineRate;
+        }
+      });
+      schoolList.value = response.data.schools;
+
+      // for (let i = 0; i < schoolList.value.length; i++) {
+      //   let school = schoolList.value[i];
+      //   school.majorGroupList = [];
+      //   let num = getRandomInt(1,3);
+      //   school.maxProbability = -1;
+      //   for (let j = 0; j < num; j++) {
+      //     let item = {
+      //       id: 200 + getRandomInt(1,9),
+      //           subjectRequirements: [
+      //             '物','生'
+      //         ],
+      //         probability: getRandomInt(50,90)
+      //     }
+      //     school.majorGroupList.push(item);
+      //
+      //     if (item.probability > school.maxProbability) {
+      //       school.maxProbability = item.probability;
+      //     }
+      //   }
+      // }
+
+      averageScores.value = response.data.averageScores;
+      total.value = response.data.total;
+    } else {
+      ElMessage.error(response.message);
+    }
+  } catch (error) {
+    ElMessage.error(error);
+  }
+  loadingInstance.close();
+};
+
 const handleCurrentChange = (newPage) => {
   pageNum.value = newPage;
   getRecommendList();
 };
 
-const handleCommit = async (schoolId) => {
+const handleCommit = async (majorGroup) => {
+  currentMajorGroup.value = majorGroup;
+  const majorGroupId = majorGroup.id;
   const loadingInstance = ElLoading.service({
     fullscreen: true,
     text: "正在加载中...",
   });
   try {
     const response = await request.get(
-      "/schoolInfoDetail?schoolId=" + schoolId
+      "/majorInfo/list/" + majorGroupId
     );
     if (response.code == 200) {
-      schoolMajors.value = response.data.majorScore;
-      VoluntaryForm.schoolName = response.data.schoolInfo.schoolName;
+      schoolMajors.value = response.data;
+      // VoluntaryForm.schoolName = response.data.schoolInfo.schoolName;
       showTableDialog.value = true;
     } else {
       ElMessage.error(response.message);
@@ -370,70 +397,63 @@ const clearSelection = () => {
 };
 
 const handleSelectionChange = (val) => {
-  if (val.length > 6) {
-    ElMessage.warning("最多选择六个专业！");
-    return;
-  }
-  VoluntaryForm.majorA =
-    val.map((item) => item.majorName).length > 0
-      ? val.map((item) => item.majorName)[0]
-      : "";
-  VoluntaryForm.majorB =
-    val.map((item) => item.majorName).length > 1
-      ? val.map((item) => item.majorName)[1]
-      : "";
-  VoluntaryForm.majorC =
-    val.map((item) => item.majorName).length > 2
-      ? val.map((item) => item.majorName)[2]
-      : "";
-  VoluntaryForm.majorD =
-    val.map((item) => item.majorName).length > 3
-      ? val.map((item) => item.majorName)[3]
-      : "";
-  VoluntaryForm.majorE =
-    val.map((item) => item.majorName).length > 4
-      ? val.map((item) => item.majorName)[4]
-      : "";
-  VoluntaryForm.majorF =
-    val.map((item) => item.majorName).length > 5
-      ? val.map((item) => item.majorName)[5]
-      : "";
+  selectedMajors.value = val;
 };
 
 const commitVoluntary = async () => {
-  if (VoluntaryForm.majorA == "") {
-    ElMessage.warning("最少选择一门专业！");
-    return;
-  }
   const loadingInstance = ElLoading.service({
     fullscreen: true,
     text: "正在加载中...",
   });
-  try {
-    const response = await request.post(
-      "/userVoluntary/addVoluntary",
-      VoluntaryForm
-    );
-    if (response.code == 200) {
-      ElMessage.success("添加成功！");
-      VoluntaryForm.schoolName = "";
-      VoluntaryForm.majorA = "";
-      VoluntaryForm.majorB = "";
-      VoluntaryForm.majorC = "";
-      VoluntaryForm.majorD = "";
-      VoluntaryForm.majorE = "";
-      VoluntaryForm.majorF = "";
-    } else {
-      ElMessage.error(response.message);
-    }
-  } catch (error) {
-    ElMessage.error(error);
+
+  let voluntary = localStorage.getItem("voluntary");
+  if (!voluntary) {
+    voluntary = {
+      majorMap: {},
+      majorGroups: []
+    };
+  } else {
+    voluntary = JSON.parse(voluntary);
   }
+
+  if (!voluntary.majorMap[currentMajorGroup.value.id]) {
+    voluntary.majorMap[currentMajorGroup.value.id] = [];
+    voluntary.majorGroups.push(currentMajorGroup.value);
+  }
+
+  voluntary.majorMap[currentMajorGroup.value.id].push(...selectedMajors.value);
+
+  localStorage.setItem("voluntary", JSON.stringify(voluntary));
+
   loadingInstance.close();
   showTableDialog.value = false;
 };
 
-onMounted(getRank(), getRecommendList());
+function getSubjectRequirements() {
+  let majorStr = userInfo.value.majorA + userInfo.value.majorB + userInfo.value.majorC;
+  let subjectRequirements = [];
+  if (majorStr.includes("物")) {
+    subjectRequirements.push("物");
+  }
+  if (majorStr.includes("生")) {
+    subjectRequirements.push("生");
+  }
+  if (majorStr.includes("历")) {
+    subjectRequirements.push("历");
+  }
+  if (majorStr.includes("地")) {
+    subjectRequirements.push("地");
+  }
+  if (majorStr.includes("政")) {
+    subjectRequirements.push("政");
+  }
+  if (majorStr.includes("化")) {
+    subjectRequirements.push("化");
+  }
+  return subjectRequirements;
+}
+
+onMounted(init);
 </script>
 
 <style scoped>

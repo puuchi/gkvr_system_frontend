@@ -138,7 +138,7 @@
         </el-table-column>
         <el-table-column label="录取概率" width="100" align="center">
           <template #default="scope">
-            <span>{{ scope.row.admissionRate }}%</span>
+            <span>{{ scope.row.probability }}%</span>
           </template>
         </el-table-column>
         <el-table-column label="专业组" min-width="400">
@@ -148,19 +148,20 @@
               border
               style="width: 100%"
             >
-              <el-table-column prop="groupName" label="组名称" width="220">
+              <el-table-column prop="majorGroupName" label="组名称" width="220">
                 <template #default="groupScope">
                   <div class="group-info">
-                    <div class="group-name">{{ groupScope.row.groupName }}</div>
+                    <div class="group-name">{{ groupScope.row.majorGroupName }}</div>
                     <div class="group-tags">
                       <el-tag size="small" type="info">
-                        选考科目: {{ groupScope.row.requiredSubjects.join('、') }}
+                        选考科目:
+<!--                        {{ groupScope.row.requiredSubjects.join('、') }}-->
                       </el-tag>
                       <el-tag 
                         size="small" 
                         :type="getRiskTagType(groupScope.row.riskLevel)"
                       >
-                        {{ groupScope.row.riskLevel }} ({{ groupScope.row.admissionRate }}%)
+                        {{ groupScope.row.riskLevel }} ({{ groupScope.row.probability }}%)
                       </el-tag>
                     </div>
                   </div>
@@ -171,52 +172,41 @@
                   <div class="major-selection">
                     <div v-for="(major, index) in groupScope.row.majors" :key="index" class="major-item">
                       <span class="major-index">{{ String.fromCharCode(65 + index) }}.</span>
-                      <el-select 
-                        v-model="major.selected" 
-                        placeholder="请选择专业"
-                        style="width: 180px"
-                      >
-                        <el-option
-                          v-for="option in groupScope.row.majorOptions"
-                          :key="option"
-                          :label="option"
-                          :value="option"
-                        />
-                      </el-select>
+                      <div class="group-name">{{ major.majorName }}</div>
                     </div>
                   </div>
                 </template>
               </el-table-column>
+              <el-table-column label="操作" width="160" align="center">
+                <template #default="groupScope">
+                  <el-button-group>
+                    <el-button
+                        type="primary"
+                        :icon="ArrowUp"
+                        @click="moveVolunteer(groupScope.$index, 'up')"
+                        :disabled="groupScope.$index === 0"
+                    >
+                      上移
+                    </el-button>
+                    <el-button
+                        type="primary"
+                        :icon="ArrowDown"
+                        @click="moveVolunteer(groupScope.$index, 'down')"
+                        :disabled="groupScope.$index === scope.row.majorGroups.length - 1"
+                    >
+                      下移
+                    </el-button>
+                    <el-button
+                        type="danger"
+                        :icon="Delete"
+                        @click="handleDelete(groupScope.row)"
+                    >
+                      删除
+                    </el-button>
+                  </el-button-group>
+                </template>
+              </el-table-column>
             </el-table>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" align="center">
-          <template #default="scope">
-            <el-button-group>
-              <el-button 
-                type="primary" 
-                :icon="ArrowUp" 
-                @click="moveVolunteer(scope.$index, 'up')"
-                :disabled="scope.$index === 0"
-              >
-                上移
-              </el-button>
-              <el-button 
-                type="primary" 
-                :icon="ArrowDown" 
-                @click="moveVolunteer(scope.$index, 'down')"
-                :disabled="scope.$index === volunteerList.length - 1"
-              >
-                下移
-              </el-button>
-              <el-button 
-                type="danger" 
-                :icon="Delete"
-                @click="handleDelete(scope.row)"
-              >
-                删除
-              </el-button>
-            </el-button-group>
           </template>
         </el-table-column>
       </el-table>
@@ -440,19 +430,56 @@ const showDialog = async () => {
     fullscreen: true,
     text: "正在加载中...",
   });
-  try {
-    const response = await request.get(
-      "/userVoluntary/getVoluntary?username=" + username.value
-    );
-    if (response.code == 200) {
-      userTable.value = response.data.userVoluntary;
-      showTableDialog.value = true;
-    } else {
-      ElMessage.error(response.message);
-    }
-  } catch (error) {
-    ElMessage.error(error);
+
+  volunteerList.value = [];
+  let schoolMap = {};
+  let voluntary = localStorage.getItem('voluntary');
+  if (voluntary) {
+    voluntary = JSON.parse(voluntary);
+
+    let probability = -1;
+    voluntary.majorGroups.forEach(majorGroup => {
+      majorGroup.majors = voluntary.majorMap[majorGroup.id];
+      if (!schoolMap[majorGroup.schoolId]) {
+        schoolMap[majorGroup.schoolId] = [];
+      }
+      let hasElement = false;
+      for (let valueElement of volunteerList.value) {
+        if (valueElement.id == majorGroup.schoolId) {
+          hasElement = true;
+          valueElement.majorGroups.push(majorGroup);
+          break;
+        }
+      }
+
+      majorGroup.requiredSubjects = ['物','生'];
+
+      if (!hasElement) {
+        probability = -1;
+        volunteerList.value.push({
+          id: majorGroup.schoolId,
+          schoolName: majorGroup.schoolName,
+          riskLevel: '稳',
+          probability: 80,
+          majorGroups: [majorGroup]
+        });
+      }
+
+      probability = majorGroup.probability > probability ? majorGroup.probability : probability;
+
+      for (let valueElement of volunteerList.value) {
+        if (valueElement.id == majorGroup.schoolId) {
+          valueElement.probability = probability;
+          valueElement.riskLevel = probability >= 80 ? '保' : probability > 60 ? '稳' : '冲';
+          break;
+        }
+      }
+    });
+  } else {
+    volunteerList.value = [];
   }
+  showTableDialog.value = true;
+
   loadingInstance.close();
 };
 
@@ -462,98 +489,20 @@ const handleDelete = async (row) => {
     fullscreen: true,
     text: "正在加载中...",
   });
-  try {
-    const response = await request.post(
-      "/userVoluntary/deleteVoluntary",
-      VoluntaryForm
-    );
-    if (response.code == 200) {
-      ElMessage.success("删除成功！");
-      VoluntaryForm.schoolName = "";
-      showDialog();
-    } else {
-      ElMessage.error(response.message);
-    }
-  } catch (error) {
-    ElMessage.error(error);
-  }
+
+  let voluntary = localStorage.getItem('voluntary');
+  voluntary = JSON.parse(voluntary);
+  voluntary.majorGroups = voluntary.majorGroups.filter((item) => item.id !== row.id);
+  delete voluntary.majorMap[row.id];
+  localStorage.setItem("voluntary", JSON.stringify(voluntary));
+  ElMessage.success("删除成功！");
+  showDialog();
   loadingInstance.close();
 };
 
 // 在script setup部分添加模拟数据
 // 模拟志愿表数据
-const volunteerList = ref([
-  {
-    id: 1,
-    schoolName: '浙江大学',
-    riskLevel: '稳',
-    admissionRate: 85,
-    majorGroups: [
-      {
-        groupName: '计算机类',
-        requiredSubjects: ['物理', '化学'],
-        riskLevel: '稳',
-        admissionRate: 85,
-        majorOptions: [
-          '计算机科学与技术',
-          '软件工程',
-          '人工智能',
-          '数据科学与大数据技术'
-        ],
-        majors: [
-          { selected: '计算机科学与技术' },
-          { selected: '软件工程' },
-          { selected: '人工智能' },
-          { selected: null }
-        ]
-      },
-      {
-        groupName: '电子信息类',
-        requiredSubjects: ['物理', '化学'],
-        riskLevel: '冲',
-        admissionRate: 65,
-        majorOptions: [
-          '电子信息工程',
-          '通信工程',
-          '电子科学与技术',
-          '微电子科学与工程'
-        ],
-        majors: [
-          { selected: '电子信息工程' },
-          { selected: null },
-          { selected: null },
-          { selected: null }
-        ]
-      }
-    ]
-  },
-  {
-    id: 2,
-    schoolName: '同济大学',
-    riskLevel: '保',
-    admissionRate: 95,
-    majorGroups: [
-      {
-        groupName: '建筑类',
-        requiredSubjects: ['物理', '化学'],
-        riskLevel: '保',
-        admissionRate: 95,
-        majorOptions: [
-          '建筑学',
-          '城乡规划',
-          '风景园林',
-          '建筑环境与能源应用工程'
-        ],
-        majors: [
-          { selected: '建筑学' },
-          { selected: '城乡规划' },
-          { selected: null },
-          { selected: null }
-        ]
-      }
-    ]
-  }
-]);
+const volunteerList = ref([]);
 
 // 添加风险评估相关的计算属性和方法
 const riskAssessment = computed(() => {
@@ -609,16 +558,21 @@ const getRiskTagType = (riskLevel) => {
 };
 
 const moveVolunteer = (index, direction) => {
+
+  let voluntary = localStorage.getItem('voluntary');
+  voluntary = JSON.parse(voluntary);
   if (direction === 'up' && index > 0) {
-    const temp = volunteerList.value[index];
-    volunteerList.value[index] = volunteerList.value[index - 1];
-    volunteerList.value[index - 1] = temp;
-  } else if (direction === 'down' && index < volunteerList.value.length - 1) {
-    const temp = volunteerList.value[index];
-    volunteerList.value[index] = volunteerList.value[index + 1];
-    volunteerList.value[index + 1] = temp;
+    const temp = voluntary.majorGroups[index];
+    voluntary.majorGroups[index] = voluntary.majorGroups[index - 1];
+    voluntary.majorGroups[index - 1] = temp;
+  } else if (direction === 'down' && index < voluntary.majorGroups.length - 1) {
+    const temp = voluntary.majorGroups[index];
+    voluntary.majorGroups[index] = voluntary.majorGroups[index + 1];
+    voluntary.majorGroups[index + 1] = temp;
   }
-  saveVolunteerOrder();
+  localStorage.setItem("voluntary", JSON.stringify(voluntary));
+  ElMessage.success("删除成功！");
+  showDialog();
 };
 
 const saveVolunteerOrder = async () => {
